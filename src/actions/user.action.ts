@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { revalidatePath } from "next/cache";
 
 export async function syncUser() {
   try {
@@ -61,7 +62,7 @@ export async function getDbUserId() {
   const { userId: clerkId } = await auth();
 
   if (!clerkId) {
-    throw new Error("Unauthorized");
+    return null;
   }
 
   const user = await getUserByClerkId(clerkId);
@@ -75,6 +76,10 @@ export async function getDbUserId() {
 export async function getRandomUsers() {
   try {
     const userId = await getDbUserId();
+
+    if (!userId) {
+      return [];
+    }
 
     const randomUsers = await prisma.user.findMany({
       where: {
@@ -117,6 +122,10 @@ export async function toggleFollow(targetUserId: string) {
   try {
     const userId = await getDbUserId();
 
+    if (!userId) {
+      return;
+    }
+
     if (userId === targetUserId) {
       throw new Error("you can not follow yourself");
     }
@@ -157,6 +166,9 @@ export async function toggleFollow(targetUserId: string) {
           },
         }),
       ]);
+
+      // update cache
+      revalidatePath("/");
 
       return { success: true };
     }
